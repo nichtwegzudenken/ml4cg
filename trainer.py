@@ -27,11 +27,15 @@ def update_average(model_tgt, model_src, beta=0.999):
 class Trainer(nn.Module):
     def __init__(self, cfg):
         super(Trainer, self).__init__()
+
         self.model = FUNITModel(cfg)
+
         lr_gen = cfg['lr_gen']
         lr_dis = cfg['lr_dis']
+
         dis_params = list(self.model.dis.parameters())
         gen_params = list(self.model.gen.parameters())
+
         self.dis_opt = torch.optim.RMSprop(
             [p for p in dis_params if p.requires_grad],
             lr=lr_gen, weight_decay=cfg['weight_decay'])
@@ -44,28 +48,66 @@ class Trainer(nn.Module):
         self.model.gen_test = copy.deepcopy(self.model.gen)
 
     def gen_update(self, co_data, cl_data, hp, multigpus):
+        """
+        Params:
+            - co_data: content data with one content image and one content image label
+            - cl_data: class data with one class image and one class image label
+            - hp: hyperparameters
+            - multigpus: if training on multiple GPUs
+        """          
         self.gen_opt.zero_grad()
+        
+        """
+        Generator update step returns:
+            - al: l_total which is the overall loss
+            - ad: l_adv which is the adversarial loss of the generator
+            - xr: l_x_rec: reconstruction loss
+            - cr: l_c_rec: feature matching loss same image
+            - sr: l_m_rec: feature matching loss translated image
+            - ac: acc
+        """
         al, ad, xr, cr, sr, ac = self.model(co_data, cl_data, hp, 'gen_update')
+
         self.loss_gen_total = torch.mean(al)
         self.loss_gen_recon_x = torch.mean(xr)
         self.loss_gen_recon_c = torch.mean(cr)
         self.loss_gen_recon_s = torch.mean(sr)
         self.loss_gen_adv = torch.mean(ad)
         self.accuracy_gen_adv = torch.mean(ac)
+
         self.gen_opt.step()
+
         this_model = self.model.module if multigpus else self.model
         update_average(this_model.gen_test, this_model.gen)
         return self.accuracy_gen_adv.item()
 
     def dis_update(self, co_data, cl_data, hp):
+        """
+        Params:
+            - co_data: content data with one content image and one content image label
+            - cl_data: class data with one class image and one class image label
+            - hp: hyperparameters
+        """         
         self.dis_opt.zero_grad()
+
+        # discriminator update step
+        """
+        Params:
+            - al: l_total: overall discriminator loss
+            - lfa: l_fake_p: fake loss term
+            - lre: l_real_pre: real loss term
+            - reg: l_reg_pre: regularization loss term
+            - acc: accuracy
+        """                   
         al, lfa, lre, reg, acc = self.model(co_data, cl_data, hp, 'dis_update')
+
         self.loss_dis_total = torch.mean(al)
         self.loss_dis_fake_adv = torch.mean(lfa)
         self.loss_dis_real_adv = torch.mean(lre)
         self.loss_dis_reg = torch.mean(reg)
         self.accuracy_dis_adv = torch.mean(acc)
         self.dis_opt.step()
+
         return self.accuracy_dis_adv.item()
 
     def test(self, co_data, cl_data, multigpus):
@@ -73,6 +115,12 @@ class Trainer(nn.Module):
         return this_model.test(co_data, cl_data)
 
     def resume(self, checkpoint_dir, hp, multigpus):
+        """
+        Params:
+            - checkpoint: checkpoint from which to resume
+            - hp: hyperparameters
+            - multigpus: if training on multiple GPUs
+        """           
         this_model = self.model.module if multigpus else self.model
 
         last_model_name = get_model_list(checkpoint_dir, "gen")
