@@ -22,17 +22,17 @@ class G2GModel(nn.Module):
         else:
             gen = self.gen_test
 
-        # content and class codes image x1 (dog)
+        # content and class codes image x1 (meerkat)
         x1_a = gen.enc_content(x1)
         x1_b = gen.enc_class_model(x1)
 
-        # content and class codes image x2 (meerkat)
+        # content and class codes image x2 (dog)
         x2_a = gen.enc_content(x2)
         x2_b = gen.enc_class_model(x2)
 
         # mixed images
-        m1 = gen.decode(x1_a, x2_b)  # translation a,b meerkat
-        m2 = gen.decode(x2_a, x1_b) # translation b,a dog
+        m1 = gen.decode(x1_a, x2_b)  # translation a,b dog
+        m2 = gen.decode(x2_a, x1_b) # translation b,a meerkat
 
         # reconstruction with itself
         xr_a = gen.decode(x1_a, x1_b)  # reconstruction of image a (dog)
@@ -47,8 +47,8 @@ class G2GModel(nn.Module):
         m2_b = gen.enc_class_model(m2)
 
         # reconstruction after reassembly stage
-        r1 = gen.decode(m1_a, m2_b)
-        r2 = gen.decode(m2_a, m1_b)
+        r1 = gen.decode(m1_a, m2_b) # meerkat
+        r2 = gen.decode(m2_a, m1_b) # dog
 
         return {
             "x1_a": x1_a,
@@ -68,13 +68,19 @@ class G2GModel(nn.Module):
         }
 
     def calc_g_loss(self, out, xa, xb, la, lb):
+
         # features for two different images: the mixed image and the original of the same class
         l_adv_t_b, gacc_t_b, xt_b_gan_feat = self.dis.calc_gen_loss(out["m1"], lb) # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt_a
         l_adv_t_a, gacc_t_a, xt_a_gan_feat = self.dis.calc_gen_loss(out["m2"], la) # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt_a
 
-        # features for two same images: the reconstructed image and the original
+        # features for feeding in two same images: the reconstructed image in the disassembly stage and the original
         l_adv_r_a, gacc_r_a, xr_a_gan_feat = self.dis.calc_gen_loss(out["xr_a"], la) # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt_a
         l_adv_r_b, gacc_r_b, xr_b_gan_feat = self.dis.calc_gen_loss(out["xr_b"], lb) # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt_a
+
+        # features for two different images: the mixed image and the reconstructed after the reassembly stage
+        # self.dis.calc_gen_loss(out["m1"], lb)
+        l_rec_a, gacc_rec_a, r1_gan_feat = self.dis.calc_gen_loss(out["r1"], la)
+        l_rec_b, gacc_rec_b, r2_gan_feat = self.dis.calc_gen_loss(out["r2"], lb)
 
         # extracting features for the feature matching loss
         _, xb_gan_feat = self.dis(xb, lb) # this extracts only features of xb
@@ -86,13 +92,21 @@ class G2GModel(nn.Module):
         l_c_rec = 0.5 * (l_c_rec_a + l_c_rec_b)
 
         # feature matching loss between two different images: the mixed image and the original of the same class
-        l_m_rec_a = recon_criterion(xt_a_gan_feat.mean(3).mean(2), xa_gan_feat.mean(3).mean(2))
-        l_m_rec_b = recon_criterion(xt_b_gan_feat.mean(3).mean(2), xb_gan_feat.mean(3).mean(2))
-        l_m_rec = 0.5 * (l_m_rec_a + l_m_rec_b)
+        l_m_rec_a = recon_criterion(xt_a_gan_feat.mean(3).mean(2), xa_gan_feat.mean(3).mean(2)) # compare mixed meerkat with original meerkat
+        l_m_rec_b = recon_criterion(xt_b_gan_feat.mean(3).mean(2), xb_gan_feat.mean(3).mean(2)) # compare mixed dog with original dog
+        l_mix_rec_a = recon_criterion(r1_gan_feat.mean(3).mean(2), xt_a_gan_feat.mean(3).mean(2)) # compare reconstructed meerkat with mixed meerkat
+        l_mix_rec_b = recon_criterion(r2_gan_feat.mean(3).mean(2), xt_b_gan_feat.mean(3).mean(2)) # compare reconstructed dog with mixed dog
+        l_m_rec = 0.25 * (l_m_rec_a + l_m_rec_b + l_mix_rec_a + l_mix_rec_b)
 
-        # reconstruction loss
-        l_x_rec = recon_criterion(xa, out["xr_a"])
-        l_x_rec = recon_criterion(xb, out["xr_b"])
+        # short reconstruction loss
+        l_x_rec_a = recon_criterion(xa, out["xr_a"])
+        l_x_rec_b = recon_criterion(xb, out["xr_b"])
+        l_x_rec = 0.5 * (l_x_rec_a + l_x_rec_b)
+
+        # long reconstruction loss
+        l_l_rec_a = recon_criterion(xa, out["r1"])
+        l_l_rec_b = recon_criterion(xb, out["r2"])
+        l_l_rec = 0.5 * (l_l_rec_a + l_l_rec_b)
 
         # adversarial loss for 
         l_adv = 0.25 * (l_adv_t_a + l_adv_t_b + l_adv_r_a + l_adv_r_b)
@@ -100,7 +114,7 @@ class G2GModel(nn.Module):
         # accuracy
         acc = 0.25 * (gacc_t_a + gacc_t_b + gacc_r_a + gacc_r_b)
 
-        return l_adv, l_x_rec, l_c_rec, l_m_rec, acc
+        return l_adv, l_x_rec, l_l_rec, l_c_rec, l_m_rec, acc
 
     def calc_d_loss(self, xa, xb, la, lb):
         # calculate discriminator's real loss
@@ -168,13 +182,13 @@ class G2GModel(nn.Module):
             # forward pass
             out = self.cross_forward(xa, xb, 'train')
 
-            l_adv, l_x_rec, l_c_rec, l_m_rec, acc = self.calc_g_loss(out, xa, xb, la, lb)            
-            l_total.backward()
+            l_adv, l_x_rec, l_l_rec, l_c_rec, l_m_rec, acc = self.calc_g_loss(out, xa, xb, la, lb)            
 
             # overall loss: adversarial, reconstruction and feature matching loss
-            l_total = (hp['gan_w'] * l_adv + hp['r_w'] * l_x_rec + hp['fm_w'] * (l_c_rec + l_m_rec))
+            l_total = (hp['gan_w'] * l_adv + hp['r_w'] * l_x_rec + hp['rl_w'] * l_l_rec + hp['fm_w'] * (l_c_rec + l_m_rec))
+            l_total.backward()
 
-            return l_total, l_adv, l_x_rec, l_c_rec, l_m_rec, acc
+            return l_total, l_adv, l_x_rec, l_l_rec, l_c_rec, l_m_rec, acc
 
         elif mode == 'dis_update':
             xb.requires_grad_()

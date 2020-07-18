@@ -13,7 +13,7 @@ import torch.nn.init as init
 from torch.optim import lr_scheduler
 
 from funit_model import FUNITModel
-
+from g2g_model import G2GModel
 
 def update_average(model_tgt, model_src, beta=0.999):
     with torch.no_grad():
@@ -28,7 +28,14 @@ class Trainer(nn.Module):
     def __init__(self, cfg):
         super(Trainer, self).__init__()
 
-        self.model = FUNITModel(cfg)
+        if cfg['mode'] == 'funit':
+            self.model = FUNITModel(cfg)
+        elif cfg['mode'] == 'g2g':
+            self.model = G2GModel(cfg)
+        else:
+            raise ValueError(
+                "Choose from the following two modes: 'funit' or 'g2g'."
+            )            
 
         lr_gen = cfg['lr_gen']
         lr_dis = cfg['lr_dis']
@@ -61,15 +68,17 @@ class Trainer(nn.Module):
         Generator update step returns:
             - al: l_total which is the overall loss
             - ad: l_adv which is the adversarial loss of the generator
-            - xr: l_x_rec: reconstruction loss
+            - xr: l_x_rec: short reconstruction loss
+            - xl: l_l_rec: long reconstruction loss
             - cr: l_c_rec: feature matching loss same image
             - sr: l_m_rec: feature matching loss translated image
             - ac: acc
         """
-        al, ad, xr, cr, sr, ac = self.model(co_data, cl_data, hp, 'gen_update')
+        al, ad, xr, xl, cr, sr, ac = self.model(co_data, cl_data, hp, 'gen_update')
 
         self.loss_gen_total = torch.mean(al)
         self.loss_gen_recon_x = torch.mean(xr)
+        self.loss_gen_recon_l = torch.mean(xl)
         self.loss_gen_recon_c = torch.mean(cr)
         self.loss_gen_recon_s = torch.mean(sr)
         self.loss_gen_adv = torch.mean(ad)

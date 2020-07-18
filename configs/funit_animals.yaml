@@ -32,6 +32,9 @@ dis:
   n_res_blks: 10              # number of residual blocks in the discriminator
   num_classes: 119            # number of classes in the training set
 
+# mode options: classical FUNIT or G2G
+mode: 'g2g'
+
 # data options
 num_workers: 4
 batch_size: 64
