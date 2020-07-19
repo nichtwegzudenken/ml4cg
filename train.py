@@ -24,6 +24,9 @@ parser.add_argument('--config',
                     type=str,
                     default='configs/funit_animals.yaml',
                     help='configuration file for training and testing')
+parser.add_argument('--ckpt',
+                    type=str,
+                    default='pretrained/animal119_gen_00200000.pt')                    
 parser.add_argument('--output_path',
                     type=str,
                     default='.',
@@ -68,11 +71,12 @@ test_class_loader = loaders[3]
 model_name = os.path.splitext(os.path.basename(opts.config))[0]
 train_writer = SummaryWriter(
     os.path.join(opts.output_path + "/logs", model_name))
+
 output_directory = os.path.join(opts.output_path + "/outputs", model_name)
 checkpoint_directory, image_directory = make_result_folders(output_directory)
 shutil.copy(opts.config, os.path.join(output_directory, 'config.yaml'))
 
-iterations = trainer.resume(checkpoint_directory,
+iterations = trainer.resume(opts.ckpt,
                             hp=config,
                             multigpus=opts.multigpus) if opts.resume else 0
 
