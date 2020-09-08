@@ -141,7 +141,7 @@ class G2GModel(nn.Module):
         # overall loss: adversarial, reconstruction and feature matching reconstruction, feature matching loss and accuracy
         return l_adv, l_rec, l_fm_rec, l_fm_m, l_long_rec, l_long_fm, l_fm_mix_rec, acc
 
-    def calc_d_loss(self, xa, xb, la, lb, gan_weight):
+    def calc_d_loss(self, xa, xb, la, lb, gan_weight, reg_weight):
         # calculate discriminator's real loss
         l_real_pre_a, acc_r_a, resp_r_a = self.dis.calc_dis_real_loss(xa, la)
         l_real_pre_b, acc_r_b, resp_r_b = self.dis.calc_dis_real_loss(xb, lb)
@@ -153,7 +153,7 @@ class G2GModel(nn.Module):
         l_reg_pre_a = self.dis.calc_grad2(resp_r_a, xa)
         l_reg_pre_b = self.dis.calc_grad2(resp_r_b, xb)
         l_reg_pre = 0.5 * (l_reg_pre_a + l_reg_pre_b)
-        l_reg = 10 * l_reg_pre
+        l_reg = reg_weight * l_reg_pre
         l_reg.backward()
 
         # generate images for the discriminator to classify
@@ -216,6 +216,7 @@ class G2GModel(nn.Module):
                         hp['r_w'] * l_rec + 
                         hp['fm_rec_w'] * l_fm_rec + 
                         hp['fm_w'] * l_fm_m +
+                        hp['rl_w'] * l_long_rec + 
                         hp['fml_w'] * l_long_fm + 
                         hp['fml_mix_rec_w'] * l_fm_mix_rec)
             l_total.backward()
@@ -227,10 +228,10 @@ class G2GModel(nn.Module):
             xa.requires_grad_()
             xb.requires_grad_() 
 
-            l_fake, l_real, l_reg, acc = self.calc_d_loss(xa, xb, la, lb, hp['gan_w'])
+            l_fake, l_real, l_reg, acc = self.calc_d_loss(xa, xb, la, lb, hp['gan_w'], hp['reg_w'])
 
             # overall loss: fake, real and regularization loss term
-            l_total = hp['gan_w'] * (l_fake + l_real) + hp['reg_w'] * l_reg
+            l_total = hp['gan_w'] * (l_fake + l_real) + l_reg
 
             return l_total, l_fake, l_real, l_reg, acc
         else:
