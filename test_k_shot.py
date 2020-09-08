@@ -51,7 +51,11 @@ transform_list = [transforms.Resize((128, 128))] + transform_list
 transform = transforms.Compose(transform_list)
 
 print('Compute average class codes for images in %s' % opts.class_image_folder)
-images = os.listdir(opts.class_image_folder)
+
+# get the class images, i.e. the k shots
+images = os.listdir(opts.class_image_folder) 
+
+# transform images to fit to network
 for i, f in enumerate(images):
     fn = os.path.join(opts.class_image_folder, f)
     img = Image.open(fn).convert('RGB')
@@ -63,6 +67,8 @@ for i, f in enumerate(images):
         else:
             new_class_code += class_code
 final_class_code = new_class_code / len(images)
+
+# prepare content image
 image = Image.open(opts.input)
 image = image.convert('RGB')
 content_img = transform(image).unsqueeze(0)

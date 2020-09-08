@@ -169,12 +169,6 @@ class Conv2dBlock(nn.Module):
 
 
 class AdaptiveInstanceNorm2d(nn.Module):
-    """
-    Params:
-        - num_features: number of feature maps, e.g. for decoder 512
-        - eps: epsilon hyperparameter
-        - momentum:
-    """    
     def __init__(self, num_features, eps=1e-5, momentum=0.1):
         super(AdaptiveInstanceNorm2d, self).__init__()
         self.num_features = num_features

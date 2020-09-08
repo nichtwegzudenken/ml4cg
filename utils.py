@@ -14,7 +14,6 @@ import torchvision.utils as vutils
 
 from data import ImageLabelFilelist
 
-
 def update_average(model_tgt, model_src, beta=0.999):
     with torch.no_grad():
         param_dict_src = dict(model_src.named_parameters())
@@ -163,7 +162,7 @@ def make_result_folders(output_directory):
 
 
 def __write_images(im_outs, dis_img_n, file_name):
-    im_outs = [images.expand(-1, 3, -1, -1) for images in im_outs]
+    im_outs = [images.expand(-1, 3, -1, -1) for images in im_outs]    
     image_tensor = torch.cat([images[:dis_img_n] for images in im_outs], 0)
     image_grid = vutils.make_grid(image_tensor.data,
                                   nrow=dis_img_n, padding=0, normalize=True)

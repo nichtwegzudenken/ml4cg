@@ -66,7 +66,17 @@ class GPPatchMcResDis(nn.Module):
         self.cnn_c = nn.Sequential(*cnn_c)
 
     def forward(self, x, y):
-        assert(x.size(0) == y.size(0))
+        """
+        Since the discriminator solves multiple adversarial classification tasks simultaneously, we get a whole vector with the outputs.
+        As we only want the cx-th output, index gives us the corresponding prediction.
+        Parameters:
+            - x: input which is an image
+            - y: 
+        Returns: 
+            - out: prediction of the discriminator
+            - feat: the features which were encoded up to the last layer of the discriminator
+        """
+        assert(x.size(0) == y.size(0)) 
         feat = self.cnn_f(x)
         out = self.cnn_c(feat)
         index = torch.LongTensor(range(out.size(0))).cuda()
@@ -74,6 +84,15 @@ class GPPatchMcResDis(nn.Module):
         return out, feat
 
     def calc_dis_fake_loss(self, input_fake, input_label):
+        """
+        Parameters:
+            - input fake: a fake (generated) input image
+            - input label: the label
+        Returns:
+            - fake_loss: the loss for the fake image
+            - fake_accuracy: the accuracy for the fake image
+            - resp_fake: response of the fake image, i.e. the prediction of the discriminator
+        """        
         resp_fake, gan_feat = self.forward(input_fake, input_label)
         total_count = torch.tensor(np.prod(resp_fake.size()),
                                    dtype=torch.float).cuda()
@@ -83,6 +102,15 @@ class GPPatchMcResDis(nn.Module):
         return fake_loss, fake_accuracy, resp_fake
 
     def calc_dis_real_loss(self, input_real, input_label):
+        """
+        Parameters:
+            - input fake: a fake (generated) input image
+            - input label: the label
+        Returns:
+            - real_loss: the loss for the real image
+            - real_accuracy: the accuracy for the real image
+            - resp_real: response of the real image, i.e. the prediction of the discriminator
+        """          
         resp_real, gan_feat = self.forward(input_real, input_label)
         total_count = torch.tensor(np.prod(resp_real.size()),
                                    dtype=torch.float).cuda()
@@ -101,6 +129,14 @@ class GPPatchMcResDis(nn.Module):
         return loss, accuracy, gan_feat
 
     def calc_grad2(self, d_out, x_in):
+        """
+        Calculates the real gradient penalty regularization proposed by Mescheder et al.
+        Parameters:
+            - d_out: prediction of the discriminator's real loss calculation
+            - x_in: input batch
+        Returns:
+            - reg: regularization term for discriminator loss
+        """          
         batch_size = x_in.size(0)
         grad_dout = autograd.grad(outputs=d_out.mean(),
                                   inputs=x_in,
