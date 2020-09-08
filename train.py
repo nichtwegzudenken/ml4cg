@@ -24,9 +24,9 @@ parser.add_argument('--config',
                     type=str,
                     default='configs/funit_animals.yaml',
                     help='configuration file for training and testing')
-parser.add_argument('--ckpt',
+parser.add_argument('--ckpt_dir',
                     type=str,
-                    default='pretrained/animal119_gen_00200000.pt')                    
+                    default='pretrained')                    
 parser.add_argument('--output_path',
                     type=str,
                     default='.',
@@ -35,7 +35,7 @@ parser.add_argument('--multigpus',
                     action="store_true")
 parser.add_argument('--batch_size',
                     type=int,
-                    default=0)
+                    default=4)
 parser.add_argument('--test_batch_size',
                     type=int,
                     default=4)
@@ -76,17 +76,18 @@ output_directory = os.path.join(opts.output_path + "/outputs", model_name)
 checkpoint_directory, image_directory = make_result_folders(output_directory)
 shutil.copy(opts.config, os.path.join(output_directory, 'config.yaml'))
 
-iterations = trainer.resume(opts.ckpt,
+iterations = trainer.resume(opts.ckpt_dir,
                             hp=config,
                             multigpus=opts.multigpus) if opts.resume else 0
 
 while True:
     for it, (co_data, cl_data) in enumerate(
             zip(train_content_loader, train_class_loader)):
+
         with Timer("Elapsed time in update: %f"):
+            
             d_acc = trainer.dis_update(co_data, cl_data, config)
-            g_acc = trainer.gen_update(co_data, cl_data, config,
-                                       opts.multigpus)
+            g_acc = trainer.gen_update(co_data, cl_data, config, opts.multigpus)
             torch.cuda.synchronize()
             print('D acc: %.4f\t G acc: %.4f' % (d_acc, g_acc))
 
@@ -110,7 +111,7 @@ while True:
                     val_image_outputs = trainer.test(val_co_data, val_cl_data,
                                                      opts.multigpus)
                     write_1images(val_image_outputs, image_directory,
-                                  'train_%s_%02d' % (key_str, t))
+                                  'train_%s_%02d' % (key_str, it))
                 for t, (test_co_data, test_cl_data) in enumerate(
                             zip(test_content_loader, test_class_loader)):
                     if t >= opts.test_batch_size:
@@ -119,13 +120,13 @@ while True:
                                                       test_cl_data,
                                                       opts.multigpus)
                     write_1images(test_image_outputs, image_directory,
-                                  'test_%s_%02d' % (key_str, t))
+                                  'test_%s_%02d' % (key_str, it))
 
         if (iterations + 1) % config['snapshot_save_iter'] == 0:
             trainer.save(checkpoint_directory, iterations, opts.multigpus)
             print('Saved model at iteration %d' % (iterations + 1))
 
-        iterations += 1
+        iterations += int(1)
         if iterations >= max_iter:
             print("Finish Training")
             sys.exit(0)

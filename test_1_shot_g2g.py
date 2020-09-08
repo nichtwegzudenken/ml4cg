@@ -16,13 +16,14 @@ from trainer import Trainer
 
 import argparse
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--config',
                     type=str,
                     default='configs/funit_animals.yaml')
 parser.add_argument('--ckpt',
                     type=str,
-                    default='pretrained/animal119_gen_00200000.pt')
+                    default='pretrained/animal149_gen.pt')
 parser.add_argument('--class_image_folder',
                     type=str,
                     default='images/n02138411')
@@ -54,32 +55,38 @@ images = os.listdir(opts.class_image_folder)
 
 # get image b
 images = os.listdir(opts.class_image_folder)
-if images.__len__ > 1:
+if len(images) > 1:
     raise IndexError(
         f"To test one shot translation, please provide one image only."
     )
-for f in enumerate(images):
+for i, f in enumerate(images):
     fn = os.path.join(opts.class_image_folder, f)
     img = Image.open(fn).convert('RGB')
     content_img_b = transform(img).unsqueeze(0).cuda()
+    with torch.no_grad():
+        class_code = trainer.model.compute_k_style(content_img_b, 1)
 
 # get image a
 image = Image.open(opts.input)
 image = image.convert('RGB')
-content_img_a = transform(image).unsqueeze(0)
+content_img = transform(image).unsqueeze(0)
 
 print('Compute translation for %s' % opts.input)
 with torch.no_grad():
     # generate output images
-    output_images = trainer.model.translate_cross(content_img_a, content_img_b)
-    
+    # output_image = trainer.model.translate_simple(content_img, class_code) # simple forward pass
+    output_images = trainer.model.translate_cross(content_img, content_img_b) # cross forward pass
+
     # output both mixed images and both reconstructed
     keys = ['m1', 'm2', 'r1', 'r2']
     for key in keys:
         output_image = output_images[key]
+
         image = output_image.detach().cpu().squeeze().numpy()
         image = np.transpose(image, (1, 2, 0))
         image = ((image + 1) * 0.5 * 255.0)
         output_img = Image.fromarray(np.uint8(image))
-        output_img.save(opts.output, 'JPEG', quality=99)
-        print('Save output to %s' % opts.output)
+        save_path = opts.output[:-3] + key + opts.output[-4:]
+        print(save_path)
+        output_img.save(save_path, 'JPEG', quality=99)
+        print('Save output to %s' % save_path)
