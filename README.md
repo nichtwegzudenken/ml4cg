@@ -1,18 +1,17 @@
 # FUNIT2FUNIT: Assessing the effect of the G2G Architecture on Disentanglement
 
+### G2G - Disentanglement by Cross-Training
+
 ![GitHub Logo](/images/funit_cross_forward_pass.png)
-Format: ![Alt Text](url)
 
-G2G - Disentanglement by Cross-Training
-
-Repository for class "Machine Learning for Computer Graphics" and project approach using FUNIT as baseline for cross-training.
-The baseline code for this project has been taken from: https://github.com/NVlabs/FUNIT.
+This is a repository for the class "Machine Learning for Computer Graphics" at Tel-Aviv University and uses Liu et al.'s FUNIT model as a baseline for our cross-training approach [[1]](#1).
+The baseline code for the FUNIT project has been taken from: https://github.com/NVlabs/FUNIT.
 
 ## Installation
 
-* Clone this repo using https://github.com/nichtwegzudenken/ml4cg.git
+* Clone this repo using ```https://github.com/nichtwegzudenken/ml4cg.git```
 * Follow Installation Instructions from the FUNIT page [FUNIT](https://github.com/NVlabs/FUNIT)
-* Install [pytorch](https://pytorch.org/) 
+* Install [pytorch](https://pytorch.org/) by following instructions on their website
 
 ## Dataset
 
@@ -40,24 +39,20 @@ To run a forward pass through the G2G architecture run:
 python test_1_shot_g2g.py --config configs/funit_animals.yaml --ckpt pretrained/animal149_gen.pt --input images/input_content.jpg --class_image_folder images/n02138411 --output images/g2g_1_shot.jpg
 ```
 The command above will take the images x1 and x2 as inputs and output four images m1, m2, r1 and r2, which correspond to the two mixed images and the two reconstructed images.
+
 ![GitHub Logo](/images/funit2funit.png)
-Format: ![Alt Text](url)
 
 The two mixed images are:
 
 ![GitHub Logo](/images/m1.jpg)
-Format: ![Alt Text](url)
 
 ![GitHub Logo](/images/m2.jpg)
-Format: ![Alt Text](url)
 
 With the reconstructed images resulting in:
 
 ![GitHub Logo](/images/r1.png)
-Format: ![Alt Text](url)
 
 ![GitHub Logo](/images/r2.png)
-Format: ![Alt Text](url)
 
 ## References
 <a id="1">[1]</a> 
