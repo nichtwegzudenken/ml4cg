@@ -52,25 +52,26 @@ class FUNITModel(nn.Module):
         if mode == 'gen_update':
 
             # forward pass
-            c_xa = self.gen.enc_content(xa)
-            s_xa = self.gen.enc_class_model(xa)
-            s_xb = self.gen.enc_class_model(xb)
-            xt = self.gen.decode(c_xa, s_xb)  # translation
-            xr = self.gen.decode(c_xa, s_xa)  # reconstruction
+            c_xa = self.gen.enc_content(xa) # xa is content code of meerkat
+            s_xa = self.gen.enc_class_model(xa) # class code of meerkat
+            s_xb = self.gen.enc_class_model(xb) # xb = dog
+            xt = self.gen.decode(c_xa, s_xb)  # translated dog
+            xr = self.gen.decode(c_xa, s_xa)  # reconstructed meerkat
 
             # adversarial loss, generator accuracy and features
-            l_adv_t, gacc_t, xt_gan_feat = self.dis.calc_gen_loss(xt, lb) # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt
+            # calc_gen_loss returns loss, accuracy and gan_feat of only first param, i.e. xt
+            l_adv_t, gacc_t, xt_gan_feat = self.dis.calc_gen_loss(xt, lb) # 
             l_adv_r, gacc_r, xr_gan_feat = self.dis.calc_gen_loss(xr, la)
 
             # extracting features for the feature matching loss
-            _, xb_gan_feat = self.dis(xb, lb) 
+            _, xb_gan_feat = self.dis(xb, lb) # xb_gan_feat are the features of the originl meerkat
             _, xa_gan_feat = self.dis(xa, la) 
 
             # feature matching loss
             l_c_rec = recon_criterion(xr_gan_feat.mean(3).mean(2), xa_gan_feat.mean(3).mean(2))
             l_m_rec = recon_criterion(xt_gan_feat.mean(3).mean(2), xb_gan_feat.mean(3).mean(2))
             
-            # reconstruction loss
+            # short reconstruction loss
             l_x_rec = recon_criterion(xr, xa)
 
             # adversarial loss for 
@@ -141,6 +142,15 @@ class FUNITModel(nn.Module):
 
         self.train()
         
+        """
+        Returns:
+            - xa: original image of domain A
+            - xr : reconstruction of two same images
+            - xt : translated mixed image
+            - xb: original image of domain B
+            - xr: test reconstruction
+            - xt: test translation
+        """        
         return xa, xr_current, xt_current, xb, xr, xt
 
     def translate_k_shot(self, co_data, cl_data, k):
